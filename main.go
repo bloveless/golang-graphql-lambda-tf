@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -74,9 +74,28 @@ type resolver struct{}
 
 // User : Resolver function for the "User" query
 func (r *resolver) User(args struct{ ID graphql.ID }) *userResolver {
-	if p := userData[args.ID]; p != nil {
-		return &userResolver{p}
+	getUserInput := dynamodb.GetItemInput{
+		TableName:              &userOrdersTable,
+		Key: map[string]*dynamodb.AttributeValue{
+			"PK": {
+				S: aws.String(fmt.Sprintf("user#%s", args.ID)),
+			},
+		},
 	}
+
+	getUserOutput, err := dynamodbClient.GetItem(&getUserInput)
+	if err != nil {
+		panic(errors.New(fmt.Sprintf("unable to get item from dynamo %v", err)))
+	}
+
+	if getUserOutput != nil && getUserOutput.Item != nil {
+		id := strings.Split(*getUserOutput.Item["PK"].S, "#")
+		return &userResolver{&user{
+			ID: graphql.ID(id[1]),
+			Name: *getUserOutput.Item["Name"].S,
+		}}
+	}
+
 	return nil
 }
 
@@ -95,12 +114,14 @@ func (r *resolver) CreateUser(args *struct{ Name string }) *userResolver {
 		},
 	}
 
+	fmt.Print("create user input", createUserInput)
+
 	createUserOutput, err := dynamodbClient.PutItem(&createUserInput)
 	if err != nil {
 		panic(errors.New(fmt.Sprintf("unable to put item in dynamo %v", err)))
 	}
 
-	log.Print("Create user output: ", createUserOutput)
+	fmt.Print("Create user output: ", createUserOutput)
 
 	return &userResolver{&user{ID: newUserId, Name: args.Name}}
 }
@@ -113,7 +134,7 @@ var (
 )
 
 func Handler(context context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	log.Printf("Processing Lambda request %s\n", request.RequestContext.RequestID)
+	fmt.Printf("Processing Lambda request %s\n", request.RequestContext.RequestID)
 
 	// If no query is provided in the HTTP request body, throw an error
 	if len(request.Body) < 1 {
@@ -127,20 +148,20 @@ func Handler(context context.Context, request events.APIGatewayProxyRequest) (ev
 	}
 
 	if request.IsBase64Encoded {
-		log.Print(request.Body)
+		fmt.Print(request.Body)
 		bodyBytes, err := base64.URLEncoding.DecodeString(request.Body)
 		if err != nil {
-			log.Print("unable to base64 decode request body ", err)
+			fmt.Print("unable to base64 decode request body ", err)
 		}
 
 		if err := json.Unmarshal(bodyBytes, &params); err != nil {
-			log.Print("Could not decode body", err)
+			fmt.Print("Could not decode body", err)
 		}
 	}
 
 	if !request.IsBase64Encoded {
 		if err := json.Unmarshal([]byte(request.Body), &params); err != nil {
-			log.Print("Could not decode body", err)
+			fmt.Print("Could not decode body", err)
 		}
 	}
 
