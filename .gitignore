@@ -1,5 +1,6 @@
 build
 infra/.terraform
+Session.vim
 
 #
 # Binaries for programs and plugins

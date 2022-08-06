@@ -3,7 +3,7 @@ let s:so_save = &g:so | let s:siso_save = &g:siso | setg so=0 siso=0 | setl so=-
 let v:this_session=expand("<sfile>:p")
 silent only
 silent tabonly
-cd ~/Projects/golang-graphql-api-tf
+cd ~/Projects/golang-graphql-lambda-tf
 if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
   let s:wipebuf = bufnr('%')
 endif
@@ -14,11 +14,11 @@ else
   set shortmess=aoO
 endif
 badd +17 Makefile
-badd +158 infra/main.tf
+badd +110 infra/main.tf
 badd +1 infra/lambda.tf
 badd +52 infra/apigateway.tf
-badd +39 main.go
-badd +12 ~/.asdf/installs/golang/1.19/packages/pkg/mod/github.com/aws/aws-lambda-go@v1.34.1/events/activemq.go
+badd +104 main.go
+badd +3 ~/.asdf/installs/golang/1.19/packages/pkg/mod/github.com/aws/aws-lambda-go@v1.34.1/events/activemq.go
 badd +486 infra/terraform.tfstate
 badd +1 infra/.terraform.lock.hcl
 badd +1 infra/dynamodb.tf
@@ -30,6 +30,9 @@ badd +469 ~/.asdf/installs/golang/1.18.3/go/src/encoding/base64/base64.go
 badd +52 ~/.asdf/installs/golang/1.18.3/packages/pkg/mod/github.com/aws/aws-sdk-go@v1.44.70/service/dynamodb/service.go
 badd +17588 ~/.asdf/installs/golang/1.18.3/packages/pkg/mod/github.com/aws/aws-sdk-go@v1.44.70/service/dynamodb/api.go
 badd +9 ~/.asdf/installs/golang/1.18.3/packages/pkg/mod/github.com/graph-gophers/graphql-go@v1.4.0/id.go
+badd +1 ~/Projects/golang-graphql-api-tf/
+badd +22 ~/.asdf/installs/golang/1.19/packages/pkg/mod/github.com/aws/aws-sdk-go@v1.44.70/service/dynamodb/service.go
+badd +17504 ~/.asdf/installs/golang/1.19/packages/pkg/mod/github.com/aws/aws-sdk-go@v1.44.70/service/dynamodb/api.go
 argglobal
 %argdel
 $argadd ~/Projects/golang-graphql-api-tf/
@@ -46,13 +49,12 @@ setlocal fdn=20
 setlocal fen
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 1 - ((0 * winheight(0) + 26) / 52)
+let s:l = 24 - ((23 * winheight(0) + 28) / 57)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 1
+keepjumps 24
 normal! 0
-lcd ~/Projects/golang-graphql-api-tf
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf
