@@ -25,10 +25,16 @@ locals {
   app_id = "${lower(var.app_name)}-${lower(var.app_env)}-${random_id.unique_suffix.hex}"
 }
 
-data "archive_file" "lambda_zip" {
+data "archive_file" "graphql_zip" {
   type        = "zip"
-  source_file = "../build/bin/app"
-  output_path = "../build/bin/app.zip"
+  source_file = "../build/bin/graphql"
+  output_path = "../build/bin/graphql.zip"
+}
+
+data "archive_file" "stock_poller_zip" {
+  type        = "zip"
+  source_file = "../build/bin/stockpoller"
+  output_path = "../build/bin/stockpoller.zip"
 }
 
 resource "random_id" "unique_suffix" {
@@ -40,14 +46,14 @@ output "api_url" {
 }
 
 
-resource "aws_cloudwatch_log_group" "hello_world" {
-  name = "/aws/lambda/${aws_lambda_function.hello_world.function_name}"
+resource "aws_cloudwatch_log_group" "graphql" {
+  name = "/aws/lambda/${aws_lambda_function.graphql.function_name}"
 
   retention_in_days = 30
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_policy" {
-  role       = aws_iam_role.lambda_exec.name
+resource "aws_iam_role_policy_attachment" "graphql_lambda_policy" {
+  role       = aws_iam_role.graphql.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
@@ -81,19 +87,19 @@ resource "aws_apigatewayv2_stage" "lambda" {
   }
 }
 
-resource "aws_apigatewayv2_integration" "hello_world" {
+resource "aws_apigatewayv2_integration" "graphql" {
   api_id = aws_apigatewayv2_api.lambda.id
 
-  integration_uri    = aws_lambda_function.hello_world.invoke_arn
+  integration_uri    = aws_lambda_function.graphql.invoke_arn
   integration_type   = "AWS_PROXY"
   integration_method = "POST"
 }
 
-resource "aws_apigatewayv2_route" "hello_world" {
+resource "aws_apigatewayv2_route" "graphql" {
   api_id = aws_apigatewayv2_api.lambda.id
 
   route_key = "POST /graphql"
-  target    = "integrations/${aws_apigatewayv2_integration.hello_world.id}"
+  target    = "integrations/${aws_apigatewayv2_integration.graphql.id}"
 }
 
 resource "aws_cloudwatch_log_group" "api_gw" {
@@ -105,19 +111,19 @@ resource "aws_cloudwatch_log_group" "api_gw" {
 resource "aws_lambda_permission" "api_gw" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.hello_world.function_name
+  function_name = aws_lambda_function.graphql.function_name
   principal     = "apigateway.amazonaws.com"
 
   source_arn = "${aws_apigatewayv2_api.lambda.execution_arn}/*/*"
 }
 
-resource "aws_lambda_function" "hello_world" {
-  filename         = data.archive_file.lambda_zip.output_path
-  function_name    = local.app_id
-  handler          = "app"
-  source_code_hash = base64sha256(data.archive_file.lambda_zip.output_path)
+resource "aws_lambda_function" "graphql" {
+  filename         = data.archive_file.graphql_zip.output_path
+  function_name    = "graphql-${lower(var.app_env)}-${random_id.unique_suffix.hex}"
+  handler          = "graphql"
+  source_code_hash = base64sha256(data.archive_file.graphql_zip.output_path)
   runtime          = "go1.x"
-  role             = aws_iam_role.lambda_exec.arn
+  role             = aws_iam_role.graphql.arn
 
   environment {
     variables = {
@@ -126,9 +132,44 @@ resource "aws_lambda_function" "hello_world" {
   }
 }
 
+resource "aws_lambda_function" "stock_poller" {
+  filename         = data.archive_file.stock_poller_zip.output_path
+  function_name    = "stock-poller-${lower(var.app_env)}-${random_id.unique_suffix.hex}"
+  handler          = "stockpoller"
+  source_code_hash = base64sha256(data.archive_file.stock_poller_zip.output_path)
+  runtime          = "go1.x"
+  role             = aws_iam_role.stockpoller.arn
+
+  environment {
+    variables = {
+      STOCKS_TABLE = aws_dynamodb_table.stocks.id
+    }
+  }
+}
+
+resource "aws_cloudwatch_event_rule" "every_hour" {
+    name = "every-hour"
+    description = "Fires every hour"
+    schedule_expression = "rate(1 hour)"
+}
+
+resource "aws_cloudwatch_event_target" "pollstocks_every_five_minutes" {
+    rule = aws_cloudwatch_event_rule.every_hour.name
+    target_id = "stock_poller"
+    arn = aws_lambda_function.stock_poller.arn
+}
+
+resource "aws_lambda_permission" "allow_cloudwatch_to_call_stockpoller" {
+    statement_id = "AllowExecutionFromCloudWatch"
+    action = "lambda:InvokeFunction"
+    function_name = aws_lambda_function.stock_poller.function_name
+    principal = "events.amazonaws.com"
+    source_arn = aws_cloudwatch_event_rule.every_hour.arn
+}
+
 # Assume role setup
-resource "aws_iam_role" "lambda_exec" {
-  name_prefix = local.app_id
+resource "aws_iam_role" "graphql" {
+  name_prefix = "graphql-${lower(var.app_env)}-${random_id.unique_suffix.hex}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -164,10 +205,10 @@ resource "aws_iam_role" "lambda_exec" {
         }
       ]
     })
-
   }
-
 }
+
+
 
 # Attach role to Managed Policy
 variable "iam_policy_arn" {
@@ -179,15 +220,99 @@ variable "iam_policy_arn" {
   ]
 }
 
-resource "aws_iam_policy_attachment" "role_attach" {
-  name       = "policy-${local.app_id}"
-  roles      = [aws_iam_role.lambda_exec.id]
+resource "aws_iam_policy_attachment" "graphql_role_attach" {
+  name       = "graphql-policy-${local.app_id}"
+  roles      = [aws_iam_role.graphql.id]
+  count      = length(var.iam_policy_arn)
+  policy_arn = element(var.iam_policy_arn, count.index)
+}
+
+# Assume role setup
+resource "aws_iam_role" "stockpoller" {
+  name_prefix = "stockpoller-${lower(var.app_env)}-${random_id.unique_suffix.hex}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Effect = "Allow"
+        Sid = ""
+      }
+    ]
+  })
+
+  inline_policy {
+    name = "SecretsReader"
+
+    policy = jsonencode({
+      Version = "2012-10-17"
+      Statement = [
+        {
+          Action = [
+            "secretsmanager:DescribeSecret",
+            "secretsmanager:GetSecretValue",
+          ]
+          Effect = "Allow"
+          Resource = ["arn:aws:secretsmanager:us-west-2:391324319136:secret:prod/GraphQLStocks-mERzvd"]
+        }
+      ]
+    })
+  }
+
+  inline_policy {
+    name = "DynamoWriter"
+
+    policy = jsonencode({
+      Version = "2012-10-17"
+      Statement = [
+        {
+          Action = [
+            "dynamodb:BatchGetItem",
+            "dynamodb:BatchWriteItem",
+            "dynamodb:GetItem",
+            "dynamodb:PutItem",
+            "dynamodb:Scan",
+            "dynamodb:UpdateItem",
+          ]
+          Effect = "Allow"
+          Resource = [aws_dynamodb_table.stocks.arn]
+        }
+      ]
+    })
+  }
+}
+
+resource "aws_iam_policy_attachment" "stockpoller_role_attach" {
+  name       = "stockpoller-policy-${local.app_id}"
+  roles      = [aws_iam_role.stockpoller.id]
   count      = length(var.iam_policy_arn)
   policy_arn = element(var.iam_policy_arn, count.index)
 }
 
 resource "aws_dynamodb_table" "user_orders" {
   name = "UserOrders-${random_id.unique_suffix.hex}"
+  billing_mode = "PROVISIONED"
+  read_capacity = 5
+  write_capacity = 5
+  hash_key = "PK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "DeletedAt"
+    enabled = true
+  }
+}
+
+resource "aws_dynamodb_table" "stocks" {
+  name = "Stocks-${random_id.unique_suffix.hex}"
   billing_mode = "PROVISIONED"
   read_capacity = 5
   write_capacity = 5

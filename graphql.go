@@ -13,7 +13,7 @@ import (
 
 var mainSchema *graphql.Schema
 
-// schema : GraphQL schema definition. This is an example schema
+// schema : GraphQL schema definition. This is an example schema. Thar be badd spellering
 var schema = `
 	schema {
 		query: Query

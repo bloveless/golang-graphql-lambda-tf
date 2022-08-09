@@ -9,4 +9,7 @@ require (
 	github.com/graph-gophers/graphql-go v1.4.0
 )
 
-require github.com/jmespath/go-jmespath v0.4.0 // indirect
+require (
+	github.com/aws/aws-secretsmanager-caching-go v1.1.0 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+)

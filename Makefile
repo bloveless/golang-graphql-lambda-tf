@@ -1,7 +1,8 @@
 .PHONY: build init plan apply destroy
 
 build:
-	GOOS=linux GOARCH=amd64 go build -o build/bin/app cmd/lambda/main.go
+	GOOS=linux GOARCH=amd64 go build -o build/bin/graphql cmd/lambda/main.go
+	GOOS=linux GOARCH=amd64 go build -o build/bin/stockpoller cmd/stockpoller/main.go
 
 run:
 	USER_ORDERS_TABLE=UserOrders-a781d5cd AWS_REGION=us-west-2 go run cmd/server/main.go
