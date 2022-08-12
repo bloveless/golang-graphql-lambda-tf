@@ -65,6 +65,8 @@ func HandleRequest() (string, error) {
 		return "", fmt.Errorf("unable to update items in dynamodb: %w", err)
 	}
 
+	fmt.Printf("Stock Results for %s: %+v\n", ots.Symbol, sr)
+
 	return fmt.Sprintf("Stock results: %v", sr), nil
 }
 
