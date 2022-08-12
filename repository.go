@@ -40,8 +40,8 @@ func (r StockRepository) UpdateItems(sr StockResponse) error {
 	for dateTime, data := range sr.TimeSeries {
 
 		sk := stockKey{
-			PK: fmt.Sprintf("stockvalue#%s#%s", sr.Symbol, dateTime.Format(time.RFC3339)),
-			SK: dateTime.Format(time.RFC3339),
+			PK: fmt.Sprintf("stockvalue#%s#%s", sr.Symbol, dateTime.UTC().Format(time.RFC3339)),
+			SK: dateTime.UTC().Format(time.RFC3339),
 		}
 
 		key, err := dynamodbattribute.MarshalMap(sk)
