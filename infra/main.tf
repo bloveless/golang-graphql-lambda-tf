@@ -1,19 +1,28 @@
 terraform {
-  backend "s3" {
-    bucket = "lambda-graphql"
-    key    = "terraform/terraform.tfstate"
-    region = "us-west-2"
+  cloud {
+    organization = "brennonloveless-personal"
+
+    workspaces {
+      name = "golang-graphql-stock-tracker"
+    }
   }
 }
 
 provider "aws" {
   region = "us-west-2"
   profile = "personal"
+
+  default_tags {
+    tags = {
+      Environment = "Production"
+      Product = "Golang Graphql Stock Tracker"
+    }
+  }
 }
 
 variable "app_name" {
   description = "Application name"
-  default     = "lambda-graphql"
+  default     = "Golang Graphql Stock Tracker"
 }
 
 variable "app_env" {
@@ -45,7 +54,6 @@ output "api_url" {
   value = aws_apigatewayv2_api.lambda.api_endpoint
 }
 
-
 resource "aws_cloudwatch_log_group" "graphql" {
   name = "/aws/lambda/${aws_lambda_function.graphql.function_name}"
 
@@ -54,6 +62,11 @@ resource "aws_cloudwatch_log_group" "graphql" {
 
 resource "aws_iam_role_policy_attachment" "graphql_lambda_policy" {
   role       = aws_iam_role.graphql.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy_attachment" "stockpoller_lambda_policy" {
+  role       = aws_iam_role.stockpoller.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
@@ -317,9 +330,15 @@ resource "aws_dynamodb_table" "stocks" {
   read_capacity = 5
   write_capacity = 5
   hash_key = "PK"
+  range_key = "SK"
 
   attribute {
     name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
     type = "S"
   }
 

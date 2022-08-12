@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
+	"os"
+	stocktracker "stock-tracker"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-secretsmanager-caching-go/secretcache"
 )
 
@@ -21,8 +23,6 @@ type appSecrets struct {
 }
 
 func HandleRequest() (string, error) {
-	client := http.Client{Timeout: 5 * time.Second}
-
 	secretId := "prod/GraphQLStocks"
 	secretCache, err := secretcache.New()
 	if err != nil {
@@ -40,18 +40,25 @@ func HandleRequest() (string, error) {
 		return "", errors.New(fmt.Sprintf("Unable to unmarshal secret json: %v", err))
 	}
 
-	resp, err := client.Get(fmt.Sprintf("https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=IBM&interval=60min&apikey=%s", secrets.AlphaVantageApiKey))
+	symbol := "AAPL"
+	stockApi := stocktracker.NewStockApi(secrets.AlphaVantageApiKey)
+	sr, err := stockApi.Get(symbol)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("Unable to get stock information for IBM: %v", err))
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("Unable to read response body: %v", err))
+		return "", fmt.Errorf("unable to get stock history for %s: %w", symbol, err)
 	}
 
-	return string(body), nil
+	sess := session.Must(session.NewSession())
+	ddb := dynamodb.New(sess, &aws.Config{})
+	repo := stocktracker.NewStockRepository(os.Getenv("STOCKS_TABLE"), ddb)
+
+	err = repo.UpdateItems(sr)
+	if err != nil {
+		return "", fmt.Errorf("unable to update items in dynamodb: %w", err)
+	}
+
+	fmt.Printf("Stock results: %v\n", sr)
+
+	return fmt.Sprintf("Stock results: %v", sr), nil
 }
 
 func main() {

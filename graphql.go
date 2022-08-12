@@ -1,4 +1,4 @@
-package graphqllambda
+package stocktracker
 
 import (
 	"errors"
@@ -127,7 +127,7 @@ type GraphQL struct {
 	userOrdersTable string
 }
 
-func New(ddb *dynamodb.DynamoDB, userOrdersTable string) GraphQL {
+func NewGraphql(ddb *dynamodb.DynamoDB, userOrdersTable string) GraphQL {
 	return GraphQL{
 		MainSchema: graphql.MustParseSchema(schema, &Resolver{ddb, userOrdersTable}),
 	}

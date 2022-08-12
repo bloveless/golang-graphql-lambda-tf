@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	graphqllambda "golang-graphql-lambda-tf"
 	"os"
+	stocktracker "stock-tracker"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -17,7 +17,7 @@ import (
 )
 
 type server struct {
-	gql             graphqllambda.GraphQL
+	gql             stocktracker.GraphQL
 	userOrdersTable string
 }
 
@@ -79,7 +79,7 @@ func main() {
 	sess := session.Must(session.NewSession())
 	ddb := dynamodb.New(sess, &aws.Config{})
 	s := server{
-		gql:             graphqllambda.New(ddb, userOrdersTable),
+		gql:             stocktracker.NewGraphql(ddb, userOrdersTable),
 		userOrdersTable: userOrdersTable,
 	}
 

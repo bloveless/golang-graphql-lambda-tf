@@ -1,10 +1,10 @@
 package main
 
 import (
-	graphqllambda "golang-graphql-lambda-tf"
 	"log"
 	"net/http"
 	"os"
+	stocktracker "stock-tracker"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -20,7 +20,7 @@ func main() {
 
 	sess := session.Must(session.NewSession())
 	ddb := dynamodb.New(sess, &aws.Config{})
-	gql := graphqllambda.New(ddb, userOrdersTable)
+	gql := stocktracker.NewGraphql(ddb, userOrdersTable)
 
 	http.Handle("/graphql", &relay.Handler{Schema: gql.MainSchema})
 	log.Print("Running server on http://127.0.0.1:8080")
