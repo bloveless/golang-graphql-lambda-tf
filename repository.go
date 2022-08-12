@@ -10,14 +10,16 @@ import (
 )
 
 type StockRepository struct {
-	stockTable string
-	ddbClient  *dynamodb.DynamoDB
+	trackedStocksTable string
+	stockTable         string
+	ddbClient          *dynamodb.DynamoDB
 }
 
-func NewStockRepository(stockTable string, ddbClient *dynamodb.DynamoDB) StockRepository {
+func NewStockRepository(trackedStocksTable string, stockTable string, ddbClient *dynamodb.DynamoDB) StockRepository {
 	return StockRepository{
-		stockTable: stockTable,
-		ddbClient:  ddbClient,
+		trackedStocksTable: trackedStocksTable,
+		stockTable:         stockTable,
+		ddbClient:          ddbClient,
 	}
 }
 
@@ -36,6 +38,101 @@ type stockValue struct {
 	Now    string  `json:":now"`
 }
 
+type TrackedStock struct {
+	Enabled    string `json:"enabled"`
+	LastPolled string `json:"last_polled"`
+	Symbol     string `json:"symbol"`
+}
+
+func (r StockRepository) GetOldestTrackedStock() (TrackedStock, error) {
+	yes := struct {
+		Yes string `json:":yes"`
+	}{Yes: "yes"}
+	values, err := dynamodbattribute.MarshalMap(yes)
+	if err != nil {
+		return TrackedStock{}, fmt.Errorf("unable to marshal yes: %w", err)
+	}
+
+	qi := &dynamodb.QueryInput{
+		TableName:                 &r.trackedStocksTable,
+		KeyConditionExpression:    aws.String("enabled = :yes"),
+		ExpressionAttributeValues: values,
+		Limit:                     aws.Int64(1),
+	}
+
+	out, err := r.ddbClient.Query(qi)
+	if err != nil {
+		return TrackedStock{}, fmt.Errorf("unable to update the oldest tracked stock: %w", err)
+	}
+
+	if *out.Count > 0 {
+		ts := TrackedStock{
+			Enabled:    *out.Items[0]["enabled"].S,
+			LastPolled: *out.Items[0]["last_polled"].S,
+			Symbol:     *out.Items[0]["symbol"].S,
+		}
+
+		return ts, nil
+	}
+
+	return TrackedStock{}, fmt.Errorf("unable to find an oldest stock")
+}
+
+func (r StockRepository) TouchTrackedStock(ts TrackedStock) error {
+	tsk := struct {
+		Enabled    string `json:"enabled"`
+		LastPolled string `json:"last_polled"`
+	}{
+		Enabled:    "yes",
+		LastPolled: ts.LastPolled,
+	}
+
+	key, err := dynamodbattribute.MarshalMap(tsk)
+	if err != nil {
+		return fmt.Errorf("unable to generate key for updating tracked stock value: %w", err)
+	}
+
+	dii := &dynamodb.DeleteItemInput{
+		TableName: aws.String(r.trackedStocksTable),
+		Key:       key,
+	}
+
+	_, err = r.ddbClient.DeleteItem(dii)
+	if err != nil {
+		return fmt.Errorf("unable to delete old tracked stock value during touch: %w", err)
+	}
+
+	v := struct {
+		Enabled    string `json:"enabled"`
+		LastPolled string `json:"last_polled"`
+		Symbol     string `json:"symbol"`
+	}{
+		Enabled:    ts.Enabled,
+		LastPolled: time.Now().UTC().Format(time.RFC3339),
+		Symbol:     ts.Symbol,
+	}
+
+	values, err := dynamodbattribute.MarshalMap(v)
+	if err != nil {
+		return fmt.Errorf("unable to generate values for updating tracked stock value: %w", err)
+	}
+
+	pii := &dynamodb.PutItemInput{
+		TableName: aws.String(r.trackedStocksTable),
+		// Key:                       key,
+		Item: values,
+		// ReturnValues: aws.String("UPDATED_NEW"),
+		// UpdateExpression:          aws.String("SET enabled = :enabled, last_polled = :last_polled, symbol = :symbol"),
+	}
+
+	_, err = r.ddbClient.PutItem(pii)
+	if err != nil {
+		return fmt.Errorf("unable to update dynamodb for touching tracked stock: %w", err)
+	}
+
+	return nil
+}
+
 func (r StockRepository) UpdateItems(sr StockResponse) error {
 
 	for dateTime, data := range sr.TimeSeries {
@@ -47,7 +144,7 @@ func (r StockRepository) UpdateItems(sr StockResponse) error {
 
 		key, err := dynamodbattribute.MarshalMap(sk)
 		if err != nil {
-			return fmt.Errorf("unable to create dynamodb item key from %+v: %w", sk, err)
+			return fmt.Errorf("unable to update  create dynamodb item key from %+v: %w", sk, err)
 		}
 
 		sv := stockValue{
@@ -75,7 +172,7 @@ func (r StockRepository) UpdateItems(sr StockResponse) error {
 
 		_, err = r.ddbClient.UpdateItem(uii)
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("unable to update dynamodb: %w", err)
 		}
 
 		fmt.Printf("Updated item: %s\n", sk.SK)

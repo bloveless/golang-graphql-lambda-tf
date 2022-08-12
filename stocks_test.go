@@ -33,6 +33,28 @@ func TestStockApi(t *testing.T) {
 	sess := session.Must(session.NewSession())
 	ddb := dynamodb.New(sess, &aws.Config{})
 
-	repo := stocktracker.NewStockRepository(os.Getenv("STOCKS_TABLE"), ddb)
+	repo := stocktracker.NewStockRepository(os.Getenv("TRACKED_STOCKS_TABLE"), os.Getenv("STOCKS_TABLE"), ddb)
 	repo.UpdateItems(sr)
+}
+
+func TestGetOldestStock(t *testing.T) {
+	loadEnv(t)
+
+	sess := session.Must(session.NewSession())
+	ddb := dynamodb.New(sess, &aws.Config{})
+
+	repo := stocktracker.NewStockRepository(os.Getenv("TRACKED_STOCKS_TABLE"), os.Getenv("STOCKS_TABLE"), ddb)
+	trackedStock, err := repo.GetOldestTrackedStock()
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	t.Log(trackedStock)
+
+	err = repo.TouchTrackedStock(trackedStock)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
 }
