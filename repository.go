@@ -27,6 +27,7 @@ type stockKey struct {
 }
 
 type stockValue struct {
+	Symbol string  `json:":symbol"`
 	High   float64 `json:":high"`
 	Low    float64 `json:":low"`
 	Open   float64 `json:":open"`
@@ -40,7 +41,7 @@ func (r StockRepository) UpdateItems(sr StockResponse) error {
 	for dateTime, data := range sr.TimeSeries {
 
 		sk := stockKey{
-			PK: fmt.Sprintf("stockvalue#%s#%s", sr.Symbol, dateTime.UTC().Format(time.RFC3339)),
+			PK: fmt.Sprintf("stockvalue#%s", sr.Symbol),
 			SK: dateTime.UTC().Format(time.RFC3339),
 		}
 
@@ -50,6 +51,7 @@ func (r StockRepository) UpdateItems(sr StockResponse) error {
 		}
 
 		sv := stockValue{
+			Symbol: sr.Symbol,
 			High:   data.High,
 			Low:    data.Low,
 			Open:   data.Open,
@@ -68,7 +70,7 @@ func (r StockRepository) UpdateItems(sr StockResponse) error {
 			Key:                       key,
 			ExpressionAttributeValues: values,
 			ReturnValues:              aws.String("UPDATED_NEW"),
-			UpdateExpression:          aws.String("SET highprice = :high, lowprice = :low, openprice = :open, closeprice = :close, volume = :volume, createdat = if_not_exists(createdat, :now), modifiedat = :now"),
+			UpdateExpression:          aws.String("SET symbol = :symbol, high_usd = :high, low_usd = :low, open_usd = :open, close_usd = :close, volume = :volume, created_at = if_not_exists(created_at, :now), modified_at = :now"),
 		}
 
 		_, err = r.ddbClient.UpdateItem(uii)

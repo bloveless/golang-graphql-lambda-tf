@@ -95,9 +95,9 @@ resource "aws_apigatewayv2_stage" "lambda" {
       status                  = "$context.status"
       responseLength          = "$context.responseLength"
       integrationErrorMessage = "$context.integrationErrorMessage"
-      }
-    )
-  }
+    }
+  )
+}
 }
 
 resource "aws_apigatewayv2_integration" "graphql" {
@@ -155,29 +155,30 @@ resource "aws_lambda_function" "stock_poller" {
 
   environment {
     variables = {
+      TRACKED_STOCKS_TABLE = aws_dynamodb_table.tracked_stocks.id
       STOCKS_TABLE = aws_dynamodb_table.stocks.id
     }
   }
 }
 
 resource "aws_cloudwatch_event_rule" "every_hour" {
-    name = "every-hour"
-    description = "Fires every hour"
-    schedule_expression = "rate(1 hour)"
+  name = "every-hour"
+  description = "Fires every hour"
+  schedule_expression = "rate(1 hour)"
 }
 
 resource "aws_cloudwatch_event_target" "pollstocks_every_five_minutes" {
-    rule = aws_cloudwatch_event_rule.every_hour.name
-    target_id = "stock_poller"
-    arn = aws_lambda_function.stock_poller.arn
+  rule = aws_cloudwatch_event_rule.every_hour.name
+  target_id = "stock_poller"
+  arn = aws_lambda_function.stock_poller.arn
 }
 
 resource "aws_lambda_permission" "allow_cloudwatch_to_call_stockpoller" {
-    statement_id = "AllowExecutionFromCloudWatch"
-    action = "lambda:InvokeFunction"
-    function_name = aws_lambda_function.stock_poller.function_name
-    principal = "events.amazonaws.com"
-    source_arn = aws_cloudwatch_event_rule.every_hour.arn
+  statement_id = "AllowExecutionFromCloudWatch"
+  action = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.stock_poller.function_name
+  principal = "events.amazonaws.com"
+  source_arn = aws_cloudwatch_event_rule.every_hour.arn
 }
 
 # Assume role setup
@@ -343,7 +344,32 @@ resource "aws_dynamodb_table" "stocks" {
   }
 
   ttl {
-    attribute_name = "DeletedAt"
+    attribute_name = "deleted_at"
     enabled = true
   }
 }
+
+resource "aws_dynamodb_table" "tracked_stocks" {
+  name = "TrackedStocks-${random_id.unique_suffix.hex}"
+  billing_mode = "PROVISIONED"
+  read_capacity = 5
+  write_capacity = 5
+  hash_key = "enabled"
+  range_key = "last_polled"
+
+  attribute {
+    name = "enabled"
+    type = "S"
+  }
+
+  attribute {
+    name = "last_polled"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "deleted_at"
+    enabled = true
+  }
+}
+
