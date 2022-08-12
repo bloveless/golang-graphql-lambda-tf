@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	stocktracker "stock-tracker"
+	"stocktracker"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"

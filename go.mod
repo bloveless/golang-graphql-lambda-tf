@@ -1,4 +1,4 @@
-module stock-tracker
+module stocktracker
 
 go 1.19
 

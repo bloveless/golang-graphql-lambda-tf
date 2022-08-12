@@ -32,6 +32,7 @@ type stockValue struct {
 	Open   float64 `json:":open"`
 	Close  float64 `json:":close"`
 	Volume float64 `json:":volume"`
+	Now    string  `json:":now"`
 }
 
 func (r StockRepository) UpdateItems(sr StockResponse) error {
@@ -54,6 +55,7 @@ func (r StockRepository) UpdateItems(sr StockResponse) error {
 			Open:   data.Open,
 			Close:  data.Close,
 			Volume: data.Volume,
+			Now:    time.Now().UTC().Format(time.RFC3339),
 		}
 
 		values, err := dynamodbattribute.MarshalMap(sv)
@@ -66,7 +68,7 @@ func (r StockRepository) UpdateItems(sr StockResponse) error {
 			Key:                       key,
 			ExpressionAttributeValues: values,
 			ReturnValues:              aws.String("UPDATED_NEW"),
-			UpdateExpression:          aws.String("SET highprice = :high, lowprice = :low, openprice = :open, closeprice = :close, volume = :volume"),
+			UpdateExpression:          aws.String("SET highprice = :high, lowprice = :low, openprice = :open, closeprice = :close, volume = :volume, createdat = is_not_exists(createdat, :now), modifiedat = :now"),
 		}
 
 		out, err := r.ddbClient.UpdateItem(uii)

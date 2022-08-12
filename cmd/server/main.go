@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	stocktracker "stock-tracker"
+	"stocktracker"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
