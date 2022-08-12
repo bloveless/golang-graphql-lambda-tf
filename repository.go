@@ -68,15 +68,15 @@ func (r StockRepository) UpdateItems(sr StockResponse) error {
 			Key:                       key,
 			ExpressionAttributeValues: values,
 			ReturnValues:              aws.String("UPDATED_NEW"),
-			UpdateExpression:          aws.String("SET highprice = :high, lowprice = :low, openprice = :open, closeprice = :close, volume = :volume, createdat = is_not_exists(createdat, :now), modifiedat = :now"),
+			UpdateExpression:          aws.String("SET highprice = :high, lowprice = :low, openprice = :open, closeprice = :close, volume = :volume, createdat = if_not_exists(createdat, :now), modifiedat = :now"),
 		}
 
-		out, err := r.ddbClient.UpdateItem(uii)
+		_, err = r.ddbClient.UpdateItem(uii)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Println(out)
+		fmt.Printf("Updated item: %s\n", sk.SK)
 	}
 
 	return nil

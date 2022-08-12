@@ -2,7 +2,7 @@ package stocktracker_test
 
 import (
 	"os"
-	stocktracker "stock-tracker"
+	"stocktracker"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
