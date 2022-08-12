@@ -65,8 +65,8 @@ resource "aws_iam_role_policy_attachment" "graphql_lambda_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_iam_role_policy_attachment" "stockpoller_lambda_policy" {
-  role       = aws_iam_role.stockpoller.name
+resource "aws_iam_role_policy_attachment" "stock_poller_lambda_policy" {
+  role       = aws_iam_role.stock_poller.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
@@ -151,7 +151,8 @@ resource "aws_lambda_function" "stock_poller" {
   handler          = "stockpoller"
   source_code_hash = base64sha256(data.archive_file.stock_poller_zip.output_path)
   runtime          = "go1.x"
-  role             = aws_iam_role.stockpoller.arn
+  role             = aws_iam_role.stock_poller.arn
+  timeout          = 60
 
   environment {
     variables = {
@@ -161,24 +162,24 @@ resource "aws_lambda_function" "stock_poller" {
   }
 }
 
-resource "aws_cloudwatch_event_rule" "every_hour" {
-  name = "every-hour"
-  description = "Fires every hour"
-  schedule_expression = "rate(1 hour)"
+resource "aws_cloudwatch_event_rule" "pollstocks_interval" {
+  name = "pollstocks-interval"
+  description = "Triggers the stock polling lambda function to gather a new set of data"
+  schedule_expression = "rate(15 minutes)"
 }
 
-resource "aws_cloudwatch_event_target" "pollstocks_every_five_minutes" {
-  rule = aws_cloudwatch_event_rule.every_hour.name
+resource "aws_cloudwatch_event_target" "pollstocks_interval" {
+  rule = aws_cloudwatch_event_rule.pollstocks_interval.name
   target_id = "stock_poller"
   arn = aws_lambda_function.stock_poller.arn
 }
 
-resource "aws_lambda_permission" "allow_cloudwatch_to_call_stockpoller" {
+resource "aws_lambda_permission" "allow_cloudwatch_to_call_stock_poller" {
   statement_id = "AllowExecutionFromCloudWatch"
   action = "lambda:InvokeFunction"
   function_name = aws_lambda_function.stock_poller.function_name
   principal = "events.amazonaws.com"
-  source_arn = aws_cloudwatch_event_rule.every_hour.arn
+  source_arn = aws_cloudwatch_event_rule.pollstocks_interval.arn
 }
 
 # Assume role setup
@@ -222,8 +223,6 @@ resource "aws_iam_role" "graphql" {
   }
 }
 
-
-
 # Attach role to Managed Policy
 variable "iam_policy_arn" {
   description = "IAM Policy to be attached to role"
@@ -242,8 +241,8 @@ resource "aws_iam_policy_attachment" "graphql_role_attach" {
 }
 
 # Assume role setup
-resource "aws_iam_role" "stockpoller" {
-  name_prefix = "stockpoller-${lower(var.app_env)}-${random_id.unique_suffix.hex}"
+resource "aws_iam_role" "stock_poller" {
+  name_prefix = "stock-poller-${lower(var.app_env)}-${random_id.unique_suffix.hex}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -289,20 +288,24 @@ resource "aws_iam_role" "stockpoller" {
             "dynamodb:BatchWriteItem",
             "dynamodb:GetItem",
             "dynamodb:PutItem",
-            "dynamodb:Scan",
+            "dynamodb:Query",
             "dynamodb:UpdateItem",
+            "dynamodb:DeleteItem",
           ]
           Effect = "Allow"
-          Resource = [aws_dynamodb_table.stocks.arn]
+          Resource = [
+            aws_dynamodb_table.stocks.arn,
+            aws_dynamodb_table.tracked_stocks.arn,
+          ]
         }
       ]
     })
   }
 }
 
-resource "aws_iam_policy_attachment" "stockpoller_role_attach" {
-  name       = "stockpoller-policy-${local.app_id}"
-  roles      = [aws_iam_role.stockpoller.id]
+resource "aws_iam_policy_attachment" "stock_poller_role_attach" {
+  name       = "stock-poller-policy-${local.app_id}"
+  roles      = [aws_iam_role.stock_poller.id]
   count      = length(var.iam_policy_arn)
   policy_arn = element(var.iam_policy_arn, count.index)
 }
