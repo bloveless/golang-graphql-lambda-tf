@@ -55,6 +55,6 @@ func TestGetOldestStock(t *testing.T) {
 	err = repo.TouchTrackedStock(trackedStock)
 	if err != nil {
 		t.Log(err)
-		t.FailNow()
+		T.FailNow()
 	}
 }

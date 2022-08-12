@@ -119,10 +119,7 @@ func (r StockRepository) TouchTrackedStock(ts TrackedStock) error {
 
 	pii := &dynamodb.PutItemInput{
 		TableName: aws.String(r.trackedStocksTable),
-		// Key:                       key,
-		Item: values,
-		// ReturnValues: aws.String("UPDATED_NEW"),
-		// UpdateExpression:          aws.String("SET enabled = :enabled, last_polled = :last_polled, symbol = :symbol"),
+		Item:      values,
 	}
 
 	_, err = r.ddbClient.PutItem(pii)
@@ -174,8 +171,6 @@ func (r StockRepository) UpdateItems(sr StockResponse) error {
 		if err != nil {
 			return fmt.Errorf("unable to update dynamodb: %w", err)
 		}
-
-		fmt.Printf("Updated item: %s\n", sk.SK)
 	}
 
 	return nil
